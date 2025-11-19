@@ -1,29 +1,28 @@
-from pprint import pprint
-
-from environs import Env
 import requests
 
 
-def get_products(token, url):
+def get_products(strapi_url: str, strapi_token: str):
     headers = {
-        "Authorization": f"Bearer {token}"
+        "Authorization": f"Bearer {strapi_token}"
     }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    if response.status_code == 200:
+    params = {
+        "populate": "*"
+    }
+
+    try:
+        response = requests.get(strapi_url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
         return response.json()
-    else:
-        return f'Ошибка: {response.status_code}, {response.text}'
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при получении продуктов: {e}")
+        return None
 
 
-def main():
-    env = Env()
-    env.read_env()
-    strapi_token = env.str('STRAPI_TOKEN')
-    strapi_url = env.str('STRAPI_URL')
-    pprint(get_products(strapi_token, strapi_url))
-
-
-if __name__ == '__main__':
-    main()
-
+def download_image(image_url: str) -> bytes:
+    try:
+        response = requests.get(image_url, timeout=10)
+        response.raise_for_status()
+        return response.content
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при скачивании изображения: {e}")
+        return None

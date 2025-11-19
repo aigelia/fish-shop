@@ -9,24 +9,17 @@ from redis.asyncio import Redis
 
 
 async def start(message: Message, state_data: dict):
-    """Бот отвечает пользователю фразой "Привет!" и переводит его в состояние ECHO."""
     await message.answer(text='Привет!')
     return "ECHO"
 
 
 async def echo(message: Message, state_data: dict):
-    """Бот отвечает пользователю тем же, что пользователь ему написал.
-    Оставляет пользователя в состоянии ECHO.
-    """
     users_reply = message.text
     await message.answer(users_reply)
     return "ECHO"
 
 
 async def handle_users_reply(message: Message, redis_conn: Redis):
-    """Получает стейт пользователя из Redis и запускает соответствующую функцию-обработчик.
-    Функция-обработчик возвращает следующее состояние, которое записывается в Redis.
-    """
     chat_id = message.chat.id
     user_reply = message.text
 
@@ -59,7 +52,6 @@ async def main():
     redis_port = env.int("DATABASE_PORT", 6379)
     redis_password = env.str("DATABASE_PASSWORD", None)
 
-    # Создаем подключение к Redis для хранения состояний
     redis_conn = Redis(
         host=redis_host,
         port=redis_port,

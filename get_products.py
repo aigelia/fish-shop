@@ -13,7 +13,7 @@ def get_products(token, url):
     if response.status_code == 200:
         return response.json()
     else:
-        return f'Ошибка:, {response.status_code}, {response.text}'
+        return f'Ошибка: {response.status_code}, {response.text}'
 
 
 def main():

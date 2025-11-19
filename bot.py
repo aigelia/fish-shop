@@ -3,115 +3,27 @@ from functools import partial
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.redis import RedisStorage
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
 from environs import Env
 from redis.asyncio import Redis
 
-from get_products import get_products, download_image
+from strapi_helpers import get_products
+from handlers import cmd_start, main_menu_handler, back_to_menu_handler
 
 
-class BotStates(StatesGroup):
-    START = State()
-    HANDLE_MENU = State()
-
-
-def get_keyboard(buttons: list, prefix: str = "option"):
-    keyboard = []
-    for idx, button in enumerate(buttons):
-        keyboard.append([InlineKeyboardButton(
-            text=button,
-            callback_data=f"{prefix}_{idx}"
-        )])
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
-
-
-def get_image_url(product: dict, strapi_base_url: str) -> str:
-    try:
-        if 'image' in product:
-            image_data = product['image']
-
-            if isinstance(image_data, dict) and 'data' in image_data:
-                url = image_data['data']['attributes']['url']
-            elif isinstance(image_data, dict) and 'url' in image_data:
-                url = image_data['url']
-            else:
-                return None
-
-            if url.startswith('/'):
-                return f"{strapi_base_url}{url}"
-            return url
-    except (KeyError, TypeError) as e:
-        print(f"Ошибка при извлечении URL изображения: {e}")
-
-    return None
-
-
-async def cmd_start(message: Message, state: FSMContext, products: list):
-    if not products:
-        await message.answer("Извините, товары временно недоступны.")
-        return
-
-    product_names = [product.get('title') for product in products]
-    reply_markup = get_keyboard(product_names, prefix='product')
-
-    await message.answer(text='Привет! Выберите товар:', reply_markup=reply_markup)
-    await state.set_state(BotStates.START)
-
-
-async def button_handler(
-        callback: CallbackQuery,
-        state: FSMContext,
-        products: list,
-        bot: Bot,
-        strapi_base_url: str
-):
-    product_id = int(callback.data.split('_')[1])
-
-    if 0 <= product_id < len(products):
-        product = products[product_id]
-
-        caption = (
-            f"{product.get('title')} "
-            f"({product.get('price')} руб. за кг)\n\n"
-            f"{product.get('description')}"
-        )
-
-        image_url = get_image_url(product, strapi_base_url)
-
-        await callback.answer()
-        await bot.delete_message(
-            chat_id=callback.message.chat.id,
-            message_id=callback.message.message_id
-        )
-
-        if image_url:
-            image_data = download_image(image_url)
-
-            if image_data:
-                photo = BufferedInputFile(image_data, filename="product.jpg")
-
-                await bot.send_photo(
-                    chat_id=callback.message.chat.id,
-                    photo=photo,
-                    caption=caption
-                )
-            else:
-                await bot.send_message(
-                    chat_id=callback.message.chat.id,
-                    text=caption
-                )
-        else:
-            await bot.send_message(
-                chat_id=callback.message.chat.id,
-                text=caption
-            )
-
-        await state.set_state(BotStates.HANDLE_MENU)
-    else:
-        await callback.answer("Ошибка: товар не найден")
+def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url: str):
+    dp.message.register(
+        partial(cmd_start, products=products),
+        Command("start")
+    )
+    dp.callback_query.register(
+        partial(main_menu_handler, products=products, bot=bot, strapi_base_url=strapi_base_url),
+        F.data.startswith('product_')
+    )
+    dp.callback_query.register(
+        partial(back_to_menu_handler, products=products, bot=bot),
+        F.data == 'back_to_menu'
+    )
 
 
 async def main():
@@ -147,14 +59,7 @@ async def main():
     storage = RedisStorage(redis=redis_conn)
     dp = Dispatcher(storage=storage)
 
-    dp.message.register(
-        partial(cmd_start, products=products),
-        Command("start")
-    )
-    dp.callback_query.register(
-        partial(button_handler, products=products, bot=bot, strapi_base_url=strapi_base_url),
-        F.data.startswith('product_')
-    )
+    register_handlers(dp, products, bot, strapi_base_url)
 
     try:
         print("Бот запущен!")

@@ -3,13 +3,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
 
-from strapi_helpers import download_image, get_or_create_cart, add_product_to_cart
+from strapi_helpers import download_image, get_or_create_cart, add_product_to_cart, get_cart_with_items, \
+    remove_cart_item
 
 
 class BotStates(StatesGroup):
     START = State()
     HANDLE_MENU = State()
     HANDLE_DESCRIPTION = State()
+    HANDLE_CART = State()
 
 
 def get_keyboard(buttons: list, prefix: str = "option"):
@@ -19,6 +21,10 @@ def get_keyboard(buttons: list, prefix: str = "option"):
             text=button,
             callback_data=f"{prefix}_{idx}"
         )])
+    keyboard.append([InlineKeyboardButton(
+        text="Моя корзина",
+        callback_data="show_cart"
+    )])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
@@ -29,10 +35,42 @@ def get_back_keyboard():
             callback_data="add_to_cart"
         )],
         [InlineKeyboardButton(
+            text="Моя корзина",
+            callback_data="show_cart"
+        )],
+        [InlineKeyboardButton(
             text="Назад",
             callback_data="back_to_menu"
         )]
     ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_cart_keyboard(cart_items: list):
+    keyboard = []
+    for item in cart_items:
+        product = item.get('product')
+        if product:
+            title = product.get('title', 'Товар')
+            item_document_id = item.get('documentId')
+            keyboard.append([InlineKeyboardButton(
+                text=f"Удалить {title}",
+                callback_data=f"remove_item_{item_document_id}"
+            )])
+
+    keyboard.append([InlineKeyboardButton(
+        text="В меню",
+        callback_data="back_to_menu"
+    )])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+def get_empty_cart_keyboard():
+    keyboard = [[InlineKeyboardButton(
+        text="Назад",
+        callback_data="back_to_menu"
+    )]]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
@@ -168,3 +206,103 @@ async def add_to_cart_handler(callback: CallbackQuery, state: FSMContext, strapi
         await callback.answer("Товар добавлен в корзину!")
     else:
         await callback.answer("Ошибка при добавлении товара в корзину", show_alert=True)
+
+
+async def show_cart_handler(callback: CallbackQuery, state: FSMContext, strapi_base_url: str, strapi_token: str,
+                            bot: Bot):
+    telegram_id = callback.from_user.id
+
+    cart = get_cart_with_items(strapi_base_url, strapi_token, telegram_id)
+
+    await callback.answer()
+    await bot.delete_message(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.message_id
+    )
+
+    if not cart or not cart.get('items'):
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text="Ваша корзина пуста",
+            reply_markup=get_empty_cart_keyboard()
+        )
+        await state.set_state(BotStates.HANDLE_CART)
+        return
+
+    cart_text = "Ваша корзина:\n\n"
+    total_price = 0
+
+    for item in cart['items']:
+        product = item.get('product')
+        quantity = item.get('quantity', 0)
+
+        if product:
+            title = product.get('title', 'Неизвестный товар')
+            price = product.get('price', 0)
+            item_total = price * quantity
+            total_price += item_total
+
+            cart_text += f"{title}\n"
+            cart_text += f"{quantity} кг × {price} руб. = {item_total} руб.\n\n"
+
+    cart_text += f"Итого: {total_price} руб."
+
+    await bot.send_message(
+        chat_id=callback.message.chat.id,
+        text=cart_text,
+        reply_markup=get_cart_keyboard(cart['items'])
+    )
+
+    await state.set_state(BotStates.HANDLE_CART)
+
+
+async def remove_item_handler(callback: CallbackQuery, state: FSMContext, strapi_base_url: str, strapi_token: str,
+                              bot: Bot):
+    item_document_id = callback.data.split('_')[2]
+
+    success = remove_cart_item(strapi_base_url, strapi_token, item_document_id)
+
+    if success:
+        telegram_id = callback.from_user.id
+        cart = get_cart_with_items(strapi_base_url, strapi_token, telegram_id)
+
+        await callback.answer("Товар удален из корзины")
+        await bot.delete_message(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.message_id
+        )
+
+        if not cart or not cart.get('items'):
+            await bot.send_message(
+                chat_id=callback.message.chat.id,
+                text="Ваша корзина пуста",
+                reply_markup=get_empty_cart_keyboard()
+            )
+            await state.set_state(BotStates.HANDLE_CART)
+            return
+
+        cart_text = "Ваша корзина:\n\n"
+        total_price = 0
+
+        for item in cart['items']:
+            product = item.get('product')
+            quantity = item.get('quantity', 0)
+
+            if product:
+                title = product.get('title', 'Неизвестный товар')
+                price = product.get('price', 0)
+                item_total = price * quantity
+                total_price += item_total
+
+                cart_text += f"{title}\n"
+                cart_text += f"{quantity} кг × {price} руб. = {item_total} руб.\n\n"
+
+        cart_text += f"Итого: {total_price} руб."
+
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text=cart_text,
+            reply_markup=get_cart_keyboard(cart['items'])
+        )
+    else:
+        await callback.answer("Ошибка при удалении товара", show_alert=True)

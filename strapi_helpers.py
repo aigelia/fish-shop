@@ -81,7 +81,8 @@ def get_or_create_cart(strapi_base_url: str, strapi_token: str, telegram_id: int
         return None
 
 
-def add_product_to_cart(strapi_base_url: str, strapi_token: str, cart_id: int, product_id: int, quantity: float = 1.0):
+def add_product_to_cart(strapi_base_url: str, strapi_token: str, cart_document_id: str, product_document_id: str,
+                        quantity: float = 1.0):
     headers = {
         "Authorization": f"Bearer {strapi_token}",
         "Content-Type": "application/json"
@@ -93,8 +94,8 @@ def add_product_to_cart(strapi_base_url: str, strapi_token: str, cart_id: int, p
         cart_item_data = {
             "data": {
                 "quantity": quantity,
-                "cart": cart_id,
-                "product": product_id
+                "cart": cart_document_id,
+                "product": product_document_id
             }
         }
 
@@ -108,3 +109,46 @@ def add_product_to_cart(strapi_base_url: str, strapi_token: str, cart_id: int, p
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при добавлении товара в корзину: {e}")
         return None
+
+
+def get_cart_with_items(strapi_base_url: str, strapi_token: str, telegram_id: int):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}"
+    }
+
+    carts_url = f"{strapi_base_url}/api/carts"
+
+    try:
+        params = {
+            "filters[telegram_id][$eq]": telegram_id,
+            "populate[items][populate][0]": "product"
+        }
+        response = requests.get(carts_url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get('data') and len(data['data']) > 0:
+            return data['data'][0]
+
+        return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при получении корзины: {e}")
+        return None
+
+
+def remove_cart_item(strapi_base_url: str, strapi_token: str, cart_item_document_id: str):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}"
+    }
+
+    cart_item_url = f"{strapi_base_url}/api/cart-items/{cart_item_document_id}"
+
+    try:
+        response = requests.delete(cart_item_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return True
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при удалении товара из корзины: {e}")
+        return False

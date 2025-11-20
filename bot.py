@@ -27,9 +27,23 @@ def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url:
         BotStates.HANDLE_DESCRIPTION
     )
     dp.callback_query.register(
+        partial(back_to_menu_handler, products=products, bot=bot),
+        F.data == 'back_to_menu',
+        BotStates.HANDLE_CART
+    )
+    dp.callback_query.register(
         partial(add_to_cart_handler, strapi_base_url=strapi_base_url, strapi_token=strapi_token),
         F.data == 'add_to_cart',
         BotStates.HANDLE_DESCRIPTION
+    )
+    dp.callback_query.register(
+        partial(show_cart_handler, strapi_base_url=strapi_base_url, strapi_token=strapi_token, bot=bot),
+        F.data == 'show_cart'
+    )
+    dp.callback_query.register(
+        partial(remove_item_handler, strapi_base_url=strapi_base_url, strapi_token=strapi_token, bot=bot),
+        F.data.startswith('remove_item_'),
+        BotStates.HANDLE_CART
     )
 
 

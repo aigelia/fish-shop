@@ -8,21 +8,28 @@ from environs import Env
 from redis.asyncio import Redis
 
 from strapi_helpers import get_products
-from handlers import cmd_start, main_menu_handler, back_to_menu_handler
+from handlers import *
 
 
-def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url: str):
+def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url: str, strapi_token: str):
     dp.message.register(
         partial(cmd_start, products=products),
         Command("start")
     )
     dp.callback_query.register(
         partial(main_menu_handler, products=products, bot=bot, strapi_base_url=strapi_base_url),
-        F.data.startswith('product_')
+        F.data.startswith('product_'),
+        BotStates.HANDLE_MENU
     )
     dp.callback_query.register(
         partial(back_to_menu_handler, products=products, bot=bot),
-        F.data == 'back_to_menu'
+        F.data == 'back_to_menu',
+        BotStates.HANDLE_DESCRIPTION
+    )
+    dp.callback_query.register(
+        partial(add_to_cart_handler, strapi_base_url=strapi_base_url, strapi_token=strapi_token),
+        F.data == 'add_to_cart',
+        BotStates.HANDLE_DESCRIPTION
     )
 
 
@@ -59,7 +66,7 @@ async def main():
     storage = RedisStorage(redis=redis_conn)
     dp = Dispatcher(storage=storage)
 
-    register_handlers(dp, products, bot, strapi_base_url)
+    register_handlers(dp, products, bot, strapi_base_url, strapi_token)
 
     try:
         print("Бот запущен!")

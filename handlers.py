@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
 
-from strapi_helpers import download_image
+from strapi_helpers import download_image, get_or_create_cart, add_product_to_cart
 
 
 class BotStates(StatesGroup):
@@ -23,10 +23,16 @@ def get_keyboard(buttons: list, prefix: str = "option"):
 
 
 def get_back_keyboard():
-    keyboard = [[InlineKeyboardButton(
-        text="Назад",
-        callback_data="back_to_menu"
-    )]]
+    keyboard = [
+        [InlineKeyboardButton(
+            text="Добавить в корзину",
+            callback_data="add_to_cart"
+        )],
+        [InlineKeyboardButton(
+            text="Назад",
+            callback_data="back_to_menu"
+        )]
+    ]
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
@@ -74,6 +80,8 @@ async def main_menu_handler(
 
     if 0 <= product_id < len(products):
         product = products[product_id]
+
+        await state.update_data(current_product_document_id=product.get('documentId'))
 
         caption = (
             f"{product.get('title')} "
@@ -135,3 +143,28 @@ async def back_to_menu_handler(callback: CallbackQuery, state: FSMContext, produ
         reply_markup=reply_markup
     )
     await state.set_state(BotStates.HANDLE_MENU)
+
+
+async def add_to_cart_handler(callback: CallbackQuery, state: FSMContext, strapi_base_url: str, strapi_token: str):
+    telegram_id = callback.from_user.id
+
+    cart = get_or_create_cart(strapi_base_url, strapi_token, telegram_id)
+
+    if not cart:
+        await callback.answer("Ошибка при создании корзины", show_alert=True)
+        return
+
+    user_data = await state.get_data()
+    product_document_id = user_data.get('current_product_document_id')
+
+    if not product_document_id:
+        await callback.answer("Ошибка: товар не выбран", show_alert=True)
+        return
+
+    cart_document_id = cart['documentId']
+    cart_item = add_product_to_cart(strapi_base_url, strapi_token, cart_document_id, product_document_id, quantity=1.0)
+
+    if cart_item:
+        await callback.answer("Товар добавлен в корзину!")
+    else:
+        await callback.answer("Ошибка при добавлении товара в корзину", show_alert=True)

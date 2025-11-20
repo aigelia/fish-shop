@@ -45,3 +45,66 @@ def download_image(image_url: str) -> bytes:
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при скачивании изображения: {e}")
         return None
+
+
+def get_or_create_cart(strapi_base_url: str, strapi_token: str, telegram_id: int):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+
+    carts_url = f"{strapi_base_url}/api/carts"
+
+    try:
+        params = {
+            "filters[telegram_id][$eq]": telegram_id,
+            "populate": "*"
+        }
+        response = requests.get(carts_url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get('data') and len(data['data']) > 0:
+            return data['data'][0]
+
+        cart_data = {
+            "data": {
+                "telegram_id": str(telegram_id)
+            }
+        }
+        response = requests.post(carts_url, headers=headers, json=cart_data, timeout=10)
+        response.raise_for_status()
+        return response.json()['data']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при работе с корзиной: {e}")
+        return None
+
+
+def add_product_to_cart(strapi_base_url: str, strapi_token: str, cart_id: int, product_id: int, quantity: float = 1.0):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+
+    cart_items_url = f"{strapi_base_url}/api/cart-items"
+
+    try:
+        cart_item_data = {
+            "data": {
+                "quantity": quantity,
+                "cart": cart_id,
+                "product": product_id
+            }
+        }
+
+        print(f"Отправка данных: {cart_item_data}")
+        response = requests.post(cart_items_url, headers=headers, json=cart_item_data, timeout=10)
+        print(f"Статус ответа: {response.status_code}")
+        print(f"Ответ: {response.text}")
+        response.raise_for_status()
+        return response.json()['data']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при добавлении товара в корзину: {e}")
+        return None

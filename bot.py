@@ -8,7 +8,7 @@ from environs import Env
 from redis.asyncio import Redis
 
 from strapi_helpers import get_products
-from handlers import *
+from handlers import cmd_start, main_menu_handler, back_to_menu_handler, add_to_cart_handler, show_cart_handler, remove_item_handler, pay_handler, email_handler, BotStates
 
 
 def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url: str, strapi_token: str):
@@ -44,6 +44,15 @@ def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url:
         partial(remove_item_handler, strapi_base_url=strapi_base_url, strapi_token=strapi_token, bot=bot),
         F.data.startswith('remove_item_'),
         BotStates.HANDLE_CART
+    )
+    dp.callback_query.register(
+        pay_handler,
+        F.data == 'pay',
+        BotStates.HANDLE_CART
+    )
+    dp.message.register(
+        partial(email_handler, strapi_base_url=strapi_base_url, strapi_token=strapi_token),
+        BotStates.WAITING_EMAIL
     )
 
 

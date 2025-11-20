@@ -152,3 +152,77 @@ def remove_cart_item(strapi_base_url: str, strapi_token: str, cart_item_document
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при удалении товара из корзины: {e}")
         return False
+
+
+def create_customer(strapi_base_url: str, strapi_token: str, telegram_id: int, email: str, username: str = None):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+
+    customers_url = f"{strapi_base_url}/api/customers"
+
+    try:
+        customer_data = {
+            "data": {
+                "telegram_id": str(telegram_id),
+                "email": email,
+                "username": username
+            }
+        }
+        response = requests.post(customers_url, headers=headers, json=customer_data, timeout=10)
+        response.raise_for_status()
+        print(f"Клиент создан: {response.json()}")
+        return response.json()['data']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при создании клиента: {e}")
+        return None
+
+
+def get_customer(strapi_base_url: str, strapi_token: str, telegram_id: int):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}"
+    }
+
+    customers_url = f"{strapi_base_url}/api/customers"
+
+    try:
+        params = {
+            "filters[telegram_id][$eq]": telegram_id
+        }
+        response = requests.get(customers_url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get('data') and len(data['data']) > 0:
+            return data['data'][0]
+
+        return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при получении клиента: {e}")
+        return None
+
+
+def link_cart_to_customer(strapi_base_url: str, strapi_token: str, cart_document_id: str, customer_document_id: str):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+
+    cart_url = f"{strapi_base_url}/api/carts/{cart_document_id}"
+
+    try:
+        cart_data = {
+            "data": {
+                "customer": customer_document_id
+            }
+        }
+        response = requests.put(cart_url, headers=headers, json=cart_data, timeout=10)
+        response.raise_for_status()
+        return response.json()['data']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при привязке корзины к клиенту: {e}")
+        return None

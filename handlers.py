@@ -4,7 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
 
 from strapi_helpers import download_image, get_or_create_cart, add_product_to_cart, get_cart_with_items, \
-    remove_cart_item
+    remove_cart_item, create_customer, get_customer, link_cart_to_customer
 
 
 class BotStates(StatesGroup):
@@ -12,6 +12,7 @@ class BotStates(StatesGroup):
     HANDLE_MENU = State()
     HANDLE_DESCRIPTION = State()
     HANDLE_CART = State()
+    WAITING_EMAIL = State()
 
 
 def get_keyboard(buttons: list, prefix: str = "option"):
@@ -58,6 +59,10 @@ def get_cart_keyboard(cart_items: list):
                 callback_data=f"remove_item_{item_document_id}"
             )])
 
+    keyboard.append([InlineKeyboardButton(
+        text="Оплатить",
+        callback_data="pay"
+    )])
     keyboard.append([InlineKeyboardButton(
         text="В меню",
         callback_data="back_to_menu"
@@ -306,3 +311,44 @@ async def remove_item_handler(callback: CallbackQuery, state: FSMContext, strapi
         )
     else:
         await callback.answer("Ошибка при удалении товара", show_alert=True)
+
+
+async def pay_handler(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer("Для оформления заказа, пожалуйста, отправьте вашу электронную почту:")
+    await state.set_state(BotStates.WAITING_EMAIL)
+
+
+async def email_handler(message: Message, state: FSMContext, strapi_base_url: str, strapi_token: str):
+    email = message.text
+    telegram_id = message.from_user.id
+    username = message.from_user.username
+
+    print(f"Получен email от пользователя:")
+    print(f"Telegram ID: {telegram_id}")
+    print(f"Username: @{username if username else 'Не указан'}")
+    print(f"Email: {email}")
+
+    customer = create_customer(strapi_base_url, strapi_token, telegram_id, email, username)
+
+    if customer:
+        print(f"Клиент сохранен в Strapi с ID: {customer.get('id')}")
+
+        cart = get_cart_with_items(strapi_base_url, strapi_token, telegram_id)
+        if cart:
+            link_cart_to_customer(strapi_base_url, strapi_token, cart['documentId'], customer['documentId'])
+            print(f"Корзина связана с клиентом")
+
+        saved_customer = get_customer(strapi_base_url, strapi_token, telegram_id)
+        if saved_customer:
+            print(f"Проверка: клиент найден в базе:")
+            print(f"  Email: {saved_customer.get('email')}")
+            print(f"  Username: {saved_customer.get('username')}")
+            print(f"  Telegram ID: {saved_customer.get('telegram_id')}")
+
+    await message.answer(
+        f"Спасибо! Ваш заказ оформлен.\n"
+        f"Мы свяжемся с вами по адресу: {email}"
+    )
+
+    await state.set_state(BotStates.HANDLE_MENU)

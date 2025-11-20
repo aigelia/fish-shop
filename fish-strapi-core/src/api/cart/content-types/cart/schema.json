@@ -25,6 +25,13 @@
       "relation": "manyToOne",
       "target": "api::customer.customer",
       "inversedBy": "carts"
+    },
+    "order_status": {
+      "type": "enumeration",
+      "enum": [
+        "active",
+        "completed"
+      ]
     }
   }
 }

@@ -479,6 +479,7 @@ export interface ApiCartCart extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::cart.cart'> &
       Schema.Attribute.Private;
+    order_status: Schema.Attribute.Enumeration<['active', 'completed']>;
     publishedAt: Schema.Attribute.DateTime;
     telegram_id: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;

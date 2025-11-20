@@ -58,22 +58,28 @@ def get_or_create_cart(strapi_base_url: str, strapi_token: str, telegram_id: int
     try:
         params = {
             "filters[telegram_id][$eq]": telegram_id,
+            "filters[order_status][$eq]": "active",
             "populate": "*"
         }
+        print(f"Ищем активную корзину для telegram_id: {telegram_id}")
         response = requests.get(carts_url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
 
         if data.get('data') and len(data['data']) > 0:
+            print(f"Найдена активная корзина: {data['data'][0].get('id')}")
             return data['data'][0]
 
+        print(f"Активная корзина не найдена, создаем новую")
         cart_data = {
             "data": {
-                "telegram_id": str(telegram_id)
+                "telegram_id": str(telegram_id),
+                "order_status": "active"
             }
         }
         response = requests.post(carts_url, headers=headers, json=cart_data, timeout=10)
         response.raise_for_status()
+        print(f"Новая корзина создана: {response.json()['data'].get('id')}")
         return response.json()['data']
 
     except requests.exceptions.RequestException as e:
@@ -121,6 +127,7 @@ def get_cart_with_items(strapi_base_url: str, strapi_token: str, telegram_id: in
     try:
         params = {
             "filters[telegram_id][$eq]": telegram_id,
+            "filters[order_status][$eq]": "active",
             "populate[items][populate][0]": "product"
         }
         response = requests.get(carts_url, headers=headers, params=params, timeout=10)
@@ -225,4 +232,55 @@ def link_cart_to_customer(strapi_base_url: str, strapi_token: str, cart_document
 
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при привязке корзины к клиенту: {e}")
+        return None
+
+
+def link_cart_to_customer_and_complete(strapi_base_url: str, strapi_token: str, cart_document_id: str,
+                                       customer_document_id: str):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+
+    cart_url = f"{strapi_base_url}/api/carts/{cart_document_id}"
+
+    try:
+        cart_data = {
+            "data": {
+                "customer": customer_document_id,
+                "order_status": "completed"
+            }
+        }
+        print(f"Обновляем корзину: customer={customer_document_id}, order_status=completed")
+        response = requests.put(cart_url, headers=headers, json=cart_data, timeout=10)
+        response.raise_for_status()
+        print(f"Корзина обновлена успешно: {response.json()}")
+        return response.json()['data']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при обновлении корзины: {e}")
+        return None
+
+
+def complete_cart(strapi_base_url: str, strapi_token: str, cart_document_id: str):
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+
+    cart_url = f"{strapi_base_url}/api/carts/{cart_document_id}"
+
+    try:
+        cart_data = {
+            "data": {
+                "order_status": "completed"
+            }
+        }
+        response = requests.put(cart_url, headers=headers, json=cart_data, timeout=10)
+        response.raise_for_status()
+        print(f"Корзина помечена как completed")
+        return response.json()['data']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при завершении корзины: {e}")
         return None

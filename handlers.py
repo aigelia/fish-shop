@@ -4,7 +4,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
 
 from strapi_helpers import download_image, get_or_create_cart, add_product_to_cart, get_cart_with_items, \
-    remove_cart_item, create_customer, get_customer, link_cart_to_customer
+    remove_cart_item, create_customer, get_customer, link_cart_to_customer, link_cart_to_customer_and_complete, \
+    complete_cart
 
 
 class BotStates(StatesGroup):
@@ -336,8 +337,9 @@ async def email_handler(message: Message, state: FSMContext, strapi_base_url: st
 
         cart = get_cart_with_items(strapi_base_url, strapi_token, telegram_id)
         if cart:
-            link_cart_to_customer(strapi_base_url, strapi_token, cart['documentId'], customer['documentId'])
-            print(f"Корзина связана с клиентом")
+            link_cart_to_customer_and_complete(strapi_base_url, strapi_token, cart['documentId'],
+                                               customer['documentId'])
+            print(f"Корзина связана с клиентом и завершена")
 
         saved_customer = get_customer(strapi_base_url, strapi_token, telegram_id)
         if saved_customer:

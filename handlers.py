@@ -1,11 +1,15 @@
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, BufferedInputFile
+from aiogram.types import (
+    Message,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    CallbackQuery,
+    BufferedInputFile
+)
 
-from strapi_helpers import download_image, get_or_create_cart, add_product_to_cart, get_cart_with_items, \
-    remove_cart_item, create_customer, get_customer, link_cart_to_customer, link_cart_to_customer_and_complete, \
-    complete_cart
+from strapi_helpers import *
 
 
 class BotStates(StatesGroup):
@@ -80,27 +84,6 @@ def get_empty_cart_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
-def get_image_url(product: dict, strapi_base_url: str) -> str:
-    try:
-        if 'image' in product:
-            image_data = product['image']
-
-            if isinstance(image_data, dict) and 'data' in image_data:
-                url = image_data['data']['attributes']['url']
-            elif isinstance(image_data, dict) and 'url' in image_data:
-                url = image_data['url']
-            else:
-                return None
-
-            if url.startswith('/'):
-                return f"{strapi_base_url}{url}"
-            return url
-    except (KeyError, TypeError) as e:
-        print(f"Ошибка при извлечении URL изображения: {e}")
-
-    return None
-
-
 async def cmd_start(message: Message, state: FSMContext, products: list):
     if not products:
         await message.answer("Извините, товары временно недоступны.")
@@ -171,7 +154,12 @@ async def main_menu_handler(
         await callback.answer("Ошибка: товар не найден")
 
 
-async def back_to_menu_handler(callback: CallbackQuery, state: FSMContext, products: list, bot: Bot):
+async def back_to_menu_handler(
+        callback: CallbackQuery,
+        state: FSMContext,
+        products: list,
+        bot: Bot
+):
     product_names = [product.get('title') for product in products]
     reply_markup = get_keyboard(product_names, prefix='product')
 
@@ -189,7 +177,12 @@ async def back_to_menu_handler(callback: CallbackQuery, state: FSMContext, produ
     await state.set_state(BotStates.HANDLE_MENU)
 
 
-async def add_to_cart_handler(callback: CallbackQuery, state: FSMContext, strapi_base_url: str, strapi_token: str):
+async def add_to_cart_handler(
+        callback: CallbackQuery,
+        state: FSMContext,
+        strapi_base_url: str,
+        strapi_token: str
+):
     telegram_id = callback.from_user.id
 
     cart = get_or_create_cart(strapi_base_url, strapi_token, telegram_id)
@@ -206,7 +199,13 @@ async def add_to_cart_handler(callback: CallbackQuery, state: FSMContext, strapi
         return
 
     cart_document_id = cart['documentId']
-    cart_item = add_product_to_cart(strapi_base_url, strapi_token, cart_document_id, product_document_id, quantity=1.0)
+    cart_item = add_product_to_cart(
+        strapi_base_url,
+        strapi_token,
+        cart_document_id,
+        product_document_id,
+        quantity=1.0
+    )
 
     if cart_item:
         await callback.answer("Товар добавлен в корзину!")
@@ -214,8 +213,13 @@ async def add_to_cart_handler(callback: CallbackQuery, state: FSMContext, strapi
         await callback.answer("Ошибка при добавлении товара в корзину", show_alert=True)
 
 
-async def show_cart_handler(callback: CallbackQuery, state: FSMContext, strapi_base_url: str, strapi_token: str,
-                            bot: Bot):
+async def show_cart_handler(
+        callback: CallbackQuery,
+        state: FSMContext,
+        strapi_base_url: str,
+        strapi_token: str,
+        bot: Bot
+):
     telegram_id = callback.from_user.id
 
     cart = get_cart_with_items(strapi_base_url, strapi_token, telegram_id)
@@ -262,8 +266,13 @@ async def show_cart_handler(callback: CallbackQuery, state: FSMContext, strapi_b
     await state.set_state(BotStates.HANDLE_CART)
 
 
-async def remove_item_handler(callback: CallbackQuery, state: FSMContext, strapi_base_url: str, strapi_token: str,
-                              bot: Bot):
+async def remove_item_handler(
+        callback: CallbackQuery,
+        state: FSMContext,
+        strapi_base_url: str,
+        strapi_token: str,
+        bot: Bot
+):
     item_document_id = callback.data.split('_')[2]
 
     success = remove_cart_item(strapi_base_url, strapi_token, item_document_id)
@@ -316,38 +325,33 @@ async def remove_item_handler(callback: CallbackQuery, state: FSMContext, strapi
 
 async def pay_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await callback.message.answer("Для оформления заказа, пожалуйста, отправьте вашу электронную почту:")
+    await callback.message.answer(
+        "Для оформления заказа, пожалуйста, отправьте вашу электронную почту:"
+    )
     await state.set_state(BotStates.WAITING_EMAIL)
 
 
-async def email_handler(message: Message, state: FSMContext, strapi_base_url: str, strapi_token: str):
+async def email_handler(
+        message: Message,
+        state: FSMContext,
+        strapi_base_url: str,
+        strapi_token: str
+):
     email = message.text
     telegram_id = message.from_user.id
     username = message.from_user.username
 
-    print(f"Получен email от пользователя:")
-    print(f"Telegram ID: {telegram_id}")
-    print(f"Username: @{username if username else 'Не указан'}")
-    print(f"Email: {email}")
-
     customer = create_customer(strapi_base_url, strapi_token, telegram_id, email, username)
 
     if customer:
-        print(f"Клиент сохранен в Strapi с ID: {customer.get('id')}")
-
         cart = get_cart_with_items(strapi_base_url, strapi_token, telegram_id)
         if cart:
-            link_cart_to_customer_and_complete(strapi_base_url, strapi_token, cart['documentId'],
-                                               customer['documentId'])
-            print(f"Корзина связана с клиентом и завершена")
-
-        saved_customer = get_customer(strapi_base_url, strapi_token, telegram_id)
-        if saved_customer:
-            print(f"Проверка: клиент найден в базе:")
-            print(f"  Email: {saved_customer.get('email')}")
-            print(f"  Username: {saved_customer.get('username')}")
-            print(f"  Telegram ID: {saved_customer.get('telegram_id')}")
-
+            link_cart_to_customer_and_complete(
+                strapi_base_url,
+                strapi_token,
+                cart['documentId'],
+                customer['documentId']
+            )
     await message.answer(
         f"Спасибо! Ваш заказ оформлен.\n"
         f"Мы свяжемся с вами по адресу: {email}"

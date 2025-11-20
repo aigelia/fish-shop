@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from functools import partial
 
 from aiogram import Bot, Dispatcher, F
@@ -7,11 +8,22 @@ from aiogram.fsm.storage.redis import RedisStorage
 from environs import Env
 from redis.asyncio import Redis
 
-from strapi_helpers import get_products
-from handlers import cmd_start, main_menu_handler, back_to_menu_handler, add_to_cart_handler, show_cart_handler, remove_item_handler, pay_handler, email_handler, BotStates
+from handlers import *
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
-def register_handlers(dp: Dispatcher, products: list, bot: Bot, strapi_base_url: str, strapi_token: str):
+def register_handlers(
+        dp: Dispatcher,
+        products: list,
+        bot: Bot,
+        strapi_base_url: str,
+        strapi_token: str
+):
     dp.message.register(
         partial(cmd_start, products=products),
         Command("start")
@@ -68,14 +80,14 @@ async def main():
     strapi_token = env.str('STRAPI_TOKEN')
     strapi_base_url = env.str('STRAPI_BASE_URL')
 
-    print("Загрузка продуктов...")
+    logger.info("Загрузка продуктов...")
     raw_products = get_products(strapi_url, strapi_token)
 
     if raw_products and 'data' in raw_products:
         products = raw_products['data']
-        print(f"Загружено товаров: {len(products)}")
+        logger.info(f"Загружено товаров: {len(products)}")
     else:
-        print("Не удалось загрузить товары, бот не будет запущен.")
+        logger.error("Не удалось загрузить товары, бот не будет запущен.")
         return
 
     redis_conn = Redis(
@@ -92,7 +104,7 @@ async def main():
     register_handlers(dp, products, bot, strapi_base_url, strapi_token)
 
     try:
-        print("Бот запущен!")
+        logger.info("Бот запущен!")
         await dp.start_polling(bot)
     finally:
         await redis_conn.close()

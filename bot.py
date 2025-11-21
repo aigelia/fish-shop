@@ -8,7 +8,18 @@ from aiogram.fsm.storage.redis import RedisStorage
 from environs import Env
 from redis.asyncio import Redis
 
-from handlers import *
+from handlers import (
+    cmd_start,
+    main_menu_handler,
+    BotStates,
+    back_to_menu_handler,
+    add_to_cart_handler,
+    show_cart_handler,
+    remove_item_handler,
+    pay_handler,
+    email_handler
+)
+from strapi_helpers import get_products
 
 logger = logging.getLogger(__file__)
 

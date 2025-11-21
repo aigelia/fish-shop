@@ -9,7 +9,15 @@ from aiogram.types import (
     BufferedInputFile
 )
 
-from strapi_helpers import *
+from strapi_helpers import (
+    get_image_url,
+    download_image,
+    get_or_create_cart,
+    add_product_to_cart,
+    get_cart_with_items,
+    remove_cart_item,
+    create_customer,link_cart_to_customer_and_complete
+)
 
 
 class BotStates(StatesGroup):

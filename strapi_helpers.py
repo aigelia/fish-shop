@@ -31,12 +31,12 @@ def get_image_url(product: dict, strapi_base_url: str) -> Optional[str]:
         if 'image' not in product:
             return None
 
-        image_data = product['image']
+        image_field = product['image']
 
-        if isinstance(image_data, dict) and 'data' in image_data:
-            url = image_data['data']['attributes']['url']
-        elif isinstance(image_data, dict) and 'url' in image_data:
-            url = image_data['url']
+        if isinstance(image_field, dict) and 'data' in image_field:
+            url = image_field['data']['attributes']['url']
+        elif isinstance(image_field, dict) and 'url' in image_field:
+            url = image_field['url']
         else:
             return None
 
@@ -63,7 +63,6 @@ def get_cart(
         strapi_token: str,
         telegram_id: int
 ) -> Optional[dict]:
-    """Получает активную корзину пользователя, если она существует."""
     headers = {
         "Authorization": f"Bearer {strapi_token}",
         "Content-Type": "application/json"
@@ -83,10 +82,10 @@ def get_cart(
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
-        data = response.json()
+        cart_response = response.json()
 
-        if data.get('data'):
-            return data['data'][0]
+        if cart_response.get('data'):
+            return cart_response['data'][0]
 
         return None
 
@@ -100,7 +99,6 @@ def create_cart(
         strapi_token: str,
         telegram_id: int
 ) -> Optional[dict]:
-    """Создает новую активную корзину для пользователя."""
     headers = {
         "Authorization": f"Bearer {strapi_token}",
         "Content-Type": "application/json"
@@ -108,7 +106,7 @@ def create_cart(
     carts_url = f"{strapi_base_url}/api/carts"
 
     try:
-        cart_data = {
+        cart_payload = {
             "data": {
                 "telegram_id": str(telegram_id),
                 "order_status": "active"
@@ -117,7 +115,7 @@ def create_cart(
         response = requests.post(
             carts_url,
             headers=headers,
-            json=cart_data,
+            json=cart_payload,
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
@@ -143,7 +141,7 @@ def add_product_to_cart(
     cart_items_url = f"{strapi_base_url}/api/cart-items"
 
     try:
-        cart_item_data = {
+        cart_item_payload = {
             "data": {
                 "quantity": quantity,
                 "cart": cart_document_id,
@@ -153,7 +151,7 @@ def add_product_to_cart(
         response = requests.post(
             cart_items_url,
             headers=headers,
-            json=cart_item_data,
+            json=cart_item_payload,
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
@@ -185,10 +183,10 @@ def get_cart_with_items(
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
-        data = response.json()
+        carts_response = response.json()
 
-        if data.get('data'):
-            return data['data'][0]
+        if carts_response.get('data'):
+            return carts_response['data'][0]
 
         return None
 
@@ -229,7 +227,7 @@ def create_customer(
     customers_url = f"{strapi_base_url}/api/customers"
 
     try:
-        customer_data = {
+        customer_payload = {
             "data": {
                 "telegram_id": str(telegram_id),
                 "email": email,
@@ -239,7 +237,7 @@ def create_customer(
         response = requests.post(
             customers_url,
             headers=headers,
-            json=customer_data,
+            json=customer_payload,
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
@@ -264,10 +262,10 @@ def get_customer(strapi_base_url: str, strapi_token: str, telegram_id: int) -> O
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
-        data = response.json()
+        customer_payload = response.json()
 
-        if data.get('data'):
-            return data['data'][0]
+        if customer_payload.get('data'):
+            return customer_payload['data'][0]
 
         return None
 
@@ -289,7 +287,7 @@ def link_cart_to_customer_and_complete(
     cart_url = f"{strapi_base_url}/api/carts/{cart_document_id}"
 
     try:
-        cart_data = {
+        cart_payload = {
             "data": {
                 "customer": customer_document_id,
                 "order_status": "completed"
@@ -298,7 +296,7 @@ def link_cart_to_customer_and_complete(
         response = requests.put(
             cart_url,
             headers=headers,
-            json=cart_data,
+            json=cart_payload,
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()

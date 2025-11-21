@@ -10,11 +10,7 @@ from redis.asyncio import Redis
 
 from handlers import *
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__file__)
 
 
 def register_handlers(
@@ -111,4 +107,9 @@ async def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s"
+    )
+    logger.setLevel(logging.INFO)
     asyncio.run(main())

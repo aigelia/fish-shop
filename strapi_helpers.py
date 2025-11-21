@@ -58,11 +58,12 @@ def download_image(image_url: str) -> Optional[bytes]:
         return None
 
 
-def get_or_create_cart(
+def get_cart(
         strapi_base_url: str,
         strapi_token: str,
         telegram_id: int
 ) -> Optional[dict]:
+    """Получает активную корзину пользователя, если она существует."""
     headers = {
         "Authorization": f"Bearer {strapi_token}",
         "Content-Type": "application/json"
@@ -87,6 +88,26 @@ def get_or_create_cart(
         if data.get('data'):
             return data['data'][0]
 
+        return None
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ошибка при получении корзины: {e}")
+        return None
+
+
+def create_cart(
+        strapi_base_url: str,
+        strapi_token: str,
+        telegram_id: int
+) -> Optional[dict]:
+    """Создает новую активную корзину для пользователя."""
+    headers = {
+        "Authorization": f"Bearer {strapi_token}",
+        "Content-Type": "application/json"
+    }
+    carts_url = f"{strapi_base_url}/api/carts"
+
+    try:
         cart_data = {
             "data": {
                 "telegram_id": str(telegram_id),
@@ -100,10 +121,11 @@ def get_or_create_cart(
             timeout=REQUEST_TIMEOUT
         )
         response.raise_for_status()
+        logger.info(f"Создана новая корзина для telegram_id: {telegram_id}")
         return response.json()['data']
 
     except requests.exceptions.RequestException as e:
-        logger.error(f"Ошибка при работе с корзиной: {e}")
+        logger.error(f"Ошибка при создании корзины: {e}")
         return None
 
 

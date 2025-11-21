@@ -12,7 +12,8 @@ from aiogram.types import (
 from strapi_helpers import (
     get_image_url,
     download_image,
-    get_or_create_cart,
+    get_cart,
+    create_cart,
     add_product_to_cart,
     get_cart_with_items,
     remove_cart_item,
@@ -193,7 +194,9 @@ async def add_to_cart_handler(
 ):
     telegram_id = callback.from_user.id
 
-    cart = get_or_create_cart(strapi_base_url, strapi_token, telegram_id)
+    cart = get_cart(strapi_base_url, strapi_token, telegram_id)
+    if not cart:
+        cart = create_cart(strapi_base_url, strapi_token, telegram_id)
 
     if not cart:
         await callback.answer("Ошибка при создании корзины", show_alert=True)
